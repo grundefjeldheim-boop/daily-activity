@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<script type="application/json" id="cowork-artifact-meta">
+{
+  "name": "Dry Cargo Signal Terminal",
+  "schemaVersion": 1,
+  "description": "Dry Cargo Signal Terminal: four-tab dashboard (oil price, bunker price, signal, noise) applying Martin Stopford's maritime economics framework to distinguish structural dry bulk supply/demand signals from short-term rate noise. News refreshed daily from Gmail shipping newsletters via GitHub Actions."
+}
+</script>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background:#f4f3ef; color:#1c1c1a; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 20px 20px 40px; }
+  header { display:flex; justify-content:space-between; align-items:flex-end; border-bottom: 2px solid #1c1c1a; padding-bottom: 12px; margin-bottom: 4px; }
+  h1 { font-size: 22px; font-weight: 700; margin:0; letter-spacing: 0.3px; }
+  .sub { font-size: 12px; color:#5f5e5a; margin-top:2px; }
+  .updated { font-size: 11px; color:#5f5e5a; text-align:right; font-family: "SF Mono", Consolas, monospace; max-width: 280px; }
+  nav { display:flex; gap:4px; margin: 16px 0 20px; border-bottom: 1px solid #d3d1c7; }
+  .tabbtn { font-family: inherit; font-size: 13px; font-weight: 600; padding: 10px 14px; border:none; background:transparent; color:#5f5e5a; cursor:pointer; border-bottom: 2px solid transparent; margin-bottom:-1px; }
+  .tabbtn.active { color:#1c1c1a; border-bottom-color:#0f6e56; }
+  .tabbtn:hover { color:#1c1c1a; }
+  .panel { display:none; }
+  .panel.active { display:block; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:12px; margin-bottom:20px; }
+  .card { background:#fff; border:1px solid #d3d1c7; border-radius:8px; padding:14px 16px; }
+  .card .label { font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#5f5e5a; margin-bottom:6px; }
+  .card .value { font-size:22px; font-weight:700; }
+  .card .delta { font-size:12px; margin-top:4px; }
+  .up { color:#3b6d11; }
+  .down { color:#a32d2d; }
+  .flat { color:#5f5e5a; }
+  section h2 { font-size:15px; font-weight:700; margin: 22px 0 8px; }
+  section p { font-size:13.5px; line-height:1.6; color:#2c2c2a; margin: 0 0 10px; }
+  .note { background:#fbf6e8; border:1px solid #e8dcaf; border-left:3px solid #ba7517; border-radius:4px; padding:10px 12px; font-size:12.5px; line-height:1.55; margin: 12px 0; }
+  .signalbox { border-left:3px solid #0f6e56; background:#eaf3ee; }
+  .noisebox { border-left:3px solid #993c1d; background:#faece7; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; margin: 8px 0 16px; }
+  th, td { text-align:left; padding:7px 8px; border-bottom:1px solid #e5e3da; }
+  th { color:#5f5e5a; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.3px; }
+  .tag { display:inline-block; font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:3px; letter-spacing:0.3px; }
+  .tag.signal { background:#c0dd97; color:#173404; }
+  .tag.noise { background:#f0997b; color:#4a1b0c; }
+  .tag.bullish { background:#c0dd97; color:#173404; }
+  .tag.bearish { background:#f0997b; color:#4a1b0c; }
+  footer { margin-top: 28px; padding-top: 12px; border-top:1px solid #d3d1c7; font-size:11px; color:#5f5e5a; }
+  .verdict { background:#1c1c1a; color:#f4f3ef; border-radius:8px; padding:16px 18px; margin: 18px 0; }
+  .verdict .label { font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#b4b2a9; margin-bottom:6px; }
+  .verdict p { color:#f4f3ef; font-size:13.5px; margin:0; }
+  .articles { margin-top: 18px; }
+  .articles h2 { font-size:15px; font-weight:700; margin: 22px 0 10px; }
+  .article { background:#fff; border:1px solid #d3d1c7; border-radius:8px; padding:12px 14px; margin-bottom:10px; }
+  .art-head { font-size:14px; font-weight:700; margin-bottom:3px; }
+  .art-meta { font-size:11.5px; color:#5f5e5a; margin-bottom:8px; }
+  .art-meta .sep { margin: 0 6px; color:#b4b2a9; }
+  .stopford { font-size:12.5px; line-height:1.55; color:#2c2c2a; border-top:1px dashed #d3d1c7; padding-top:8px; margin-top:6px; }
+  .stopford-label { font-weight:700; color:#0f6e56; }
+  .chapter { display:block; font-size:11px; color:#5f5e5a; margin-top:4px; font-style:italic; }
+  .caveat { font-size:11px; color:#856404; background:#fbf6e8; border:1px solid #e8dcaf; border-radius:4px; padding:8px 10px; margin: 10px 0 16px; }
+  .score { font-weight:700; }
+  .rejtag { display:inline-block; font-size:10px; font-weight:700; padding:1px 6px; border-radius:3px; letter-spacing:0.3px; background:#e5e3da; color:#5f5e5a; font-family:"SF Mono", Consolas, monospace; }
+  .live-head { display:flex; justify-content:space-between; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .pill { display:inline-block; font-size:10px; font-weight:700; padding:1px 6px; border-radius:3px; background:#e5e3da; color:#5f5e5a; font-family:"SF Mono", Consolas, monospace; margin-right:4px; }
+  .art-head a { color:inherit; text-decoration:none; border-bottom:1px dotted #b4b2a9; }
+  .art-head a:hover { border-bottom-color:#1c1c1a; }
+  .empty { font-size:12.5px; color:#5f5e5a; padding:10px 0; }
+  .reviewed { font-size:11px; color:#856404; }
+  @media (max-width:600px){ header{flex-direction:column;align-items:flex-start;gap:8px} .updated{text-align:left;max-width:none} nav{overflow-x:auto} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>Dry Cargo Signal Terminal</h1>
+    <div class="sub">Shipping economics desk &mdash; Stopford framework</div>
+  </div>
+  <div class="updated" id="updatedAt"><!--STATUS_START-->LIVE FEED &middot; waiting for first run<!--STATUS_END--><br><span class="reviewed">Analyst review &amp; prices: 19 Aug 2026</span></div>
+</header>
+
+<nav>
+  <button class="tabbtn active" data-tab="oil">Oil price</button>
+  <button class="tabbtn" data-tab="bunker">Bunker price</button>
+  <button class="tabbtn" data-tab="signal">Signal</button>
+  <button class="tabbtn" data-tab="noise">Noise</button>
+</nav>
+
+<div class="panel active" id="oil">
+  <div class="grid">
+    <div class="card">
+      <div class="label">Brent crude</div>
+      <div class="value">$91.51</div>
+      <div class="delta up">&#9650; +0.54% on the day, Aug 19, 2026</div>
+    </div>
+    <div class="card">
+      <div class="label">Daily change</div>
+      <div class="value">+$0.49</div>
+      <div class="delta flat">Aug 19 vs Aug 18, 2026 close</div>
+    </div>
+    <div class="card">
+      <div class="label">1-month / year-on-year change</div>
+      <div class="value">&mdash;</div>
+      <div class="delta flat">data gap &mdash; not found this pass</div>
+    </div>
+  </div>
+  <section>
+    <h2>What's moving it</h2>
+    <p>Brent held a firm bid at $91.51/bbl on Aug 19, up modestly on the day. The move sits inside a broader run of Gulf-risk headlines rather than a single new catalyst: TradeWinds alerts in the last 26 hours show Sinokor VLCCs loading Saudi crude in the Gulf as Aramco restarts exports around continuing attacks, Oslo tanker stocks rallying as charterers scramble to replace Middle Eastern and Russian barrels, and a report that the UAE has halted trade with Iran after missiles were aimed at its ships. None of this is dry-cargo-specific &mdash; it is background context for the bunker-cost and general Gulf-risk picture, not a bulk carrier supply/demand signal in its own right.</p>
+    <div class="note">Oil price feeds this terminal mainly as a bunker-cost driver and a Gulf-risk proxy. A crude-price move on tanker/Gulf headlines is <strong>not</strong> the same signal as a structural change in dry bulk supply or demand &mdash; see the Signal vs Noise tabs before reacting to this move.</div>
+  </section>
+
+  <div class="articles">
+    <h2>Articles &amp; commentary &mdash; 19 Aug 2026</h2>
+    <div class="caveat">Chapter references below point to the general topic area in Martin Stopford's <em>Maritime Economics</em> (freight market mechanics, ship demand, shipping cycles). They are thematic pointers, applying his published principles &mdash; not verified page or chapter citations.</div>
+
+    <div class="article">
+      <div class="art-head">Brent rises to $91.51/bbl</div>
+      <div class="art-meta">Aug 19, 2026 <span class="sep">&middot;</span> Trading Economics <span class="sep">&middot;</span> tradingeconomics.com/commodity/brent-crude-oil</div>
+      <div class="stopford"><span class="stopford-label">Per Stopford's framework:</span> a modest day-on-day move against a backdrop of Gulf attack headlines is the expectations/sentiment layer at work, not a change to dry-cargo fleet supply or tonne-mile demand.</div>
+    </div>
+    <div class="article">
+      <div class="art-head">Sinokor VLCCs load in Gulf as Aramco restarts exports amid attacks</div>
+      <div class="art-meta">Aug 19, 2026 <span class="sep">&middot;</span> TradeWinds (Tankers alert) <span class="sep">&middot;</span> headline only, paywalled &mdash; sourced from grunde@fjeldheimops.com</div>
+      <div class="stopford"><span class="stopford-label">Per Stopford's framework:</span> tanker-specific cargo restart; wrong sector for the dry bulk model, included here only as Gulf-risk/oil-price context.</div>
+    </div>
+    <div class="article">
+      <div class="art-head">Oslo tanker stocks gain as charterers rush to replace Middle East and Russian oil</div>
+      <div class="art-meta">Aug 19, 2026 <span class="sep">&middot;</span> TradeWinds (Suezmax alert) <span class="sep">&middot;</span> headline only, paywalled &mdash; sourced from grunde@fjeldheimops.com</div>
+      <div class="stopford"><span class="stopford-label">Per Stopford's framework:</span> tanker equities reacting to crude-sourcing disruption &mdash; background only, not a bulk carrier signal.</div>
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="bunker">
+  <div class="grid">
+    <div class="card">
+      <div class="label">VLSFO Singapore</div>
+      <div class="value">$835/mt</div>
+      <div class="delta down">&#9660; $0.50/mt on the day, Aug 19, 2026</div>
+    </div>
+    <div class="card">
+      <div class="label">HSFO (IFO380) Singapore</div>
+      <div class="value">$670/mt</div>
+      <div class="delta up">&#9650; +$6.50/mt on the day, Aug 19, 2026</div>
+    </div>
+    <div class="card">
+      <div class="label">LSMGO Singapore</div>
+      <div class="value">$1,263.50/mt</div>
+      <div class="delta up">&#9650; +$13.50/mt on the day, Aug 19, 2026</div>
+    </div>
+  </div>
+  <section>
+    <h2>What's moving it</h2>
+    <p>Singapore bunker prices were mixed on Aug 19: VLSFO eased slightly to $835/mt while HSFO and LSMGO both firmed, narrowing the VLSFO&ndash;HSFO spread to roughly $165/mt. The moves track the broader Gulf-risk premium in crude rather than any dry-bulk-specific driver. Rotterdam is a data gap this pass &mdash; no current print was found in search; treat any Rotterdam figure not shown here as unverified.</p>
+    <div class="note">Data gap: no confirmed Aug 2026 Rotterdam bunker print was found this pass. HSFO/LSMGO levels above are sourced from Bunker Index; a same-day Ship &amp; Bunker check (Aug 18 print: VLSFO $833/mt, LSMGO $1,257/mt) is broadly consistent but not identical &mdash; treat the figures above as indicative Singapore levels, not a reconciled single feed.</div>
+  </section>
+
+  <div class="articles">
+    <h2>Articles &amp; commentary &mdash; 19 Aug 2026</h2>
+    <div class="article">
+      <div class="art-head">Singapore Bunker Prices &mdash; VLSFO, IFO380 (HSFO), LSMGO</div>
+      <div class="art-meta">Aug 19, 2026 <span class="sep">&middot;</span> Bunker Index <span class="sep">&middot;</span> bunkerindex.com/prices/port.php?p=682&amp;n=singapore-singapore</div>
+      <div class="stopford"><span class="stopford-label">Per Stopford's framework:</span> bunker cost is part of owners' opex, which Stopford treats as an effective floor for freight rates during trough phases. A firming HSFO/MGO complex compresses margins before it shows up in headline freight rates.
+        <span class="chapter">Theme area: cost of operating ships / opex and the rate floor &mdash; Maritime Economics (chapter number not verified)</span>
+      </div>
+    </div>
+    <div class="article">
+      <div class="art-head">Singapore Bunker Prices</div>
+      <div class="art-meta">Aug 18, 2026 <span class="sep">&middot;</span> Ship &amp; Bunker <span class="sep">&middot;</span> shipandbunker.com/prices/apac/sea/sg-sin-singapore</div>
+      <div class="stopford"><span class="stopford-label">Per Stopford's framework:</span> secondary source used to cross-check the Bunker Index print above &mdash; same cost-side read, not a cargo-demand signal.</div>
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="signal">
+  <div class="articles" style="margin-top:0">
+    <div class="live-head"><h2>Live feed &mdash; signal</h2><span class="pill">AUTO &middot; RULE-BASED</span></div>
+    <div class="caveat">Refreshed daily from shipping newsletters in Gmail (plus public RSS where reachable). Classified by keyword rules applying Stopford's supply / demand / effective-supply tests &mdash; a first pass, not a judgement. Email items show the headline only; the link opens a web search for the story.</div>
+    <div id="liveSignal"><div class="empty">No items yet.</div></div>
+  </div>
+
+  <div class="verdict">
+    <div class="label">Working read &middot; analyst review 19 Aug 2026</div>
+    <p>A genuinely two-sided day. The structural, slow-moving variable Stopford weighs most heavily &mdash; the global newbuilding orderbook &mdash; is growing at its fastest pace since the eve of 2008, a cross-sector wave that is bearish for freight over a 2&ndash;4 year horizon regardless of what dry bulk's own share of it turns out to be (not broken out in the source; treated as a data gap, not assumed). Running against that: escalating, repeating attacks on bulk carriers in both the Black Sea and the Persian Gulf/Hormuz are sustaining the war-risk and rerouting premium that has been propping up effective tonne-mile demand, and a drought-driven Panama Canal draft squeeze is starting to add distance to the smaller bulk segments. The single largest risk to the bullish side of this ledger is the same one flagged in the source material itself: a Red Sea/Hormuz de-escalation would reverse the diversion premium within weeks, landing a still-swelling orderbook into a thinner market. This is a read of public reporting, not a trading recommendation.</p>
+  </div>
+
+  <table>
+    <tr><th>Signal</th><th>Mechanism</th><th>Score</th></tr>
+    <tr><td>Bulker attacks: Black Sea + Hormuz chokepoints</td><td>War risk / rerouting, tonnage temporarily immobilised</td><td><span class="tag bullish">+5</span></td></tr>
+    <tr><td>Global orderbook growth, fastest since 2008</td><td>Cross-sector newbuild contracting, adds fleet capacity 2028+</td><td><span class="tag bearish">&minus;7</span></td></tr>
+    <tr><td>Panama Canal drought / draft cuts</td><td>Rerouting adds sailing distance, esp. supramax/ultramax</td><td><span class="tag bullish">+5</span></td></tr>
+    <tr><td>Black Sea grain export shortfall</td><td>Reduced cargo volume on a major bulk grain corridor</td><td><span class="tag bearish">&minus;3</span></td></tr>
+  </table>
+
+  <section>
+    <h2>Signal detail, per Stopford</h2>
+
+    <p><strong>1. Escalating attacks on bulk carriers &mdash; Black Sea and Persian Gulf/Hormuz (+5).</strong> A Greek-flagged bulker was left burning and abandoned after five Russian-trading vessels were attacked in the Black Sea (TradeWinds, headline only). Separately, the panamax bulker <em>Minoan Dignity</em> (Modion Maritime) was struck off Oman in the Strait of Hormuz, killing the chief engineer &mdash; TradeWinds frames it as the third Modion-managed bulker attacked after an Iran-linked grain voyage, and a Houthi strike on a ship in a "renewed Red Sea port barrage" was reported in the same alert batch. This is a repeating pattern across two separate chokepoints, not a single-event story, so it clears the noise bar. Mechanism: rising war-risk premiums and Cape-routing incentives sustain (not add to) the diversion-driven tonne-mile inflation that has been supporting freight. Horizon: live, week-to-week.</p>
+
+    <div class="note signalbox"><strong>Special watch &mdash; Red Sea/Hormuz normalisation:</strong> transit disruption is <em>not</em> resolving; if anything the last 26 hours brought a fresh Houthi strike and a fresh Hormuz bulker hit. This remains the largest live risk to any bullish freight position &mdash; a ceasefire or de-escalation would reverse the diversion premium within weeks and is not something this desk can predict.</div>
+
+    <p><strong>2. Global newbuilding orderbook growth, fastest pace since 2008 (&minus;7).</strong> The global orderbook stood at 9,012 ships / 405.9m gt against an existing fleet of 117,022 ships / 1.8bn gt as of August 2026 &mdash; up 27% year-on-year, roughly 70&ndash;75% above the decade-to-date average backlog, and the fastest growth rate since the pre-2008 ordering boom. The source describes appetite as firm "across all the major shipping sectors" but does not break out dry bulk's specific share &mdash; treated here as a data gap, not assumed to be proportionally represented. Employment status (pre-employed vs speculative) for the underlying orders is likewise not disclosed this pass. Industry voice cited (Harry Vafias, owner) calls the pace "statistically wrong." <span class="stopford-label">Per Stopford:</span> this is the textbook newbuilding time-lag mechanic &mdash; capital committed today lands as delivered tonnage in 2&ndash;4 years, regardless of whether the disruption-driven demand propping up today's rates persists. Report explicitly per the cross-sector ordering wave watch item.</p>
+
+    <p><strong>3. Panama Canal drought-driven draft and booking cuts (+5).</strong> The Panama Canal Authority has cut daily bookings from 36 to 34 vessels and is progressively lowering neopanamax draft limits &mdash; to 14.6m on Aug 26 and 14.5m from Sep 3 &mdash; as Gatun Lake levels fall on a forecast strong El Ni&ntilde;o (NOAA: &gt;90% probability of a strong event, 69% chance of exceeding all recorded events since 1950). During the comparable 2023 drought, South America route diversification added roughly 1.1% to bulk tonne-mile demand overall and about 2.2% for supramax/ultramax specifically, as owners rerouted rather than pay auction premiums. Current restrictions are described as modest next to the 2023&ndash;24 extremes but on a worsening trajectory. Horizon: weeks to a few months, within the decision window.</p>
+
+    <p><strong>4. Black Sea grain export volume shortfall (&minus;3).</strong> The Russian Union of Grain Exporters warns of a possible 30&ndash;35m tonne shortfall this season if the maritime campaign against grain shipping continues; Ukraine's August shipments are down 76% year-on-year and wheat exports down 18% seasonally. Cargo is being partially rerouted to Baltic and Caspian ports, but those alternatives are capacity-constrained and are not expected to offset the loss. <span class="stopford-label">Per Stopford:</span> a genuine reduction in trade volume on a major dry bulk corridor is a real demand-side drag, only partly offset by the rerouting-distance effect already captured in signal #1 above &mdash; net read is mildly bearish, not zero.</div>
+  </section>
+
+  <div class="articles">
+    <h2>Analyst review &mdash; 19 Aug 2026</h2>
+    <div class="article">
+      <div class="art-head">Burning Greek bulker abandoned as five Russian-trading ships attacked in Black Sea</div>
+      <div class="art-meta">Aug 19, 2026 <span class="sep">&middot;</span> TradeWinds (Bulkers alert) <span class="sep">&middot;</span> headline only, paywalled &mdash; sourced from grunde@fjeldheimops.com</div>
+      <div class="stopford"><span class="stopford-label">Per Stopford's framework:</span> tonnage removed from active trading plus a rising war-risk premium &mdash; capacity-path mechanism, not a single-event story given the repeating pattern.</div>
+    </div>
+    <div class="article">
+      <div class="art-head">Modion bulker was the third to be attacked after grain voyage to Iran</div>
+      <div class="art-meta">Aug 19, 2026 <span class="sep">&middot;</span> TradeWinds (Bulkers alert) <span class="sep">&middot;</span> headline only, paywalled &mdash; sourced from grunde@fjeldheimops.com</div>
+      <div class="stopford"><span class="stopford-label">Per Stopford's framework:</span> corroborated by public reporting (see Splash247 below) &mdash; the panamax <em>Minoan Dignity</em>, chief engineer killed, third such attack on a Modion-managed bulker.</div>
+    </div>
+    <div class="article">
+      <div class="art-head">Seafarer killed in latest Hormuz strike</div>
+      <div class="art-meta">Aug 18, 2026 (event: Aug 17 evening) <span class="sep">&middot;</span> Splash247 <span class="sep">&middot;</span> splash247.com/seafarer-killed-in-latest-hormuz-strike/</div>
+      <div class="stopford"><span class="stopford-label">Per Stopford's framework:</span> public-source detail behind the TradeWinds headline above &mdash; panamax bulker <em>Minoan Dignity</em> hit ~5nm off Oman; war-risk premiums and Cape-routing pressure follow directly from incidents like this.</div>
+    </div>
+    <div class="article">
+      <div class="art-head">Global ship orderbook growth hits fastest pace since pre-Lehman boom</div>
+      <div class="art-meta">Aug 19, 2026 <span class="sep">&middot;</span> Splash247 <span class="sep">&middot;</span> splash247.com/global-ship-orderbook-growth-hits-fastest-pace-since-pre-lehman-boom/</div>
+      <div class="stopford"><span class="stopford-label">Per Stopford's framework:</span> the newbuilding time-lag mechanic in its clearest form &mdash; 27% y/y orderbook growth, capital committed regardless of whether current disruption-driven demand persists.
+        <span class="chapter">Theme area: the newbuilding time lag and cycle overshoot &mdash; Maritime Economics (chapter number not verified)</span>
+      </div>
+    </div>
+    <div class="article">
+      <div class="art-head">Red dots flash warning for Panama Canal shipping</div>
+      <div class="art-meta">Aug 19, 2026 <span class="sep">&middot;</span> Splash247 <span class="sep">&middot;</span> splash247.com/red-dots-flash-warning-for-panama-canal-shipping/</div>
+      <div class="stopford"><span class="stopford-label">Per Stopford's framework:</span> a routing/sailing-distance mechanism &mdash; drought-driven draft restrictions lengthen effective voyage distance, directly expanding tonne-mile demand for the segments that reroute.
+        <span class="chapter">Theme area: sea transport demand / trade route geography &mdash; Maritime Economics (chapter number not verified)</span>
+      </div>
+    </div>
+    <div class="article">
+      <div class="art-head">Black Sea grain trade buckles under maritime war</div>
+      <div class="art-meta">Publish date not confirmed in search (events dated Aug 12&ndash;13, 2026) <span class="sep">&middot;</span> Splash247 <span class="sep">&middot;</span> splash247.com/black-sea-grain-trade-buckles-under-maritime-war/</div>
+      <div class="stopford"><span class="stopford-label">Per Stopford's framework:</span> a genuine trade-volume signal &mdash; cargo lost, not just rerouted, on a major dry bulk grain corridor.</div>
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="noise">
+  <div class="articles" style="margin-top:0">
+    <div class="live-head"><h2>Live feed &mdash; noise</h2><span class="pill">AUTO &middot; RULE-BASED</span></div>
+    <div class="caveat">Refreshed daily from shipping newsletters in Gmail (plus public RSS where reachable). Classified by keyword rules applying Stopford's supply / demand / effective-supply tests &mdash; a first pass, not a judgement. Email items show the headline only; the link opens a web search for the story.</div>
+    <div id="liveNoise"><div class="empty">No items yet.</div></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="label">Baltic Dry Index</div>
+      <div class="value">2,815</div>
+      <div class="delta down">&#9660; 63 pts (2.19%), Aug 18, 2026</div>
+    </div>
+    <div class="card">
+      <div class="label">Capesize / Panamax / Supramax (BCI/BPI/BSI)</div>
+      <div class="value">&mdash;</div>
+      <div class="delta flat">data gap &mdash; sub-index levels not found this pass</div>
+    </div>
+    <div class="card">
+      <div class="label">Capesize TCE (reference)</div>
+      <div class="value">$36,002/day</div>
+      <div class="delta flat">balticdryindex.com, date not separately confirmed</div>
+    </div>
+  </div>
+  <section>
+    <h2>Why this is noise, per Stopford</h2>
+    <p>The daily BDI print itself &mdash; down 63 points to 2,815 on Aug 18 &mdash; is an output of the structural and disruption-driven signals covered in the Signal tab, not an independent input, so it's tagged <span class="rejtag">ALREADY-IN-PRICE</span> here rather than scored on its own. The rest of today's TradeWinds flow was dominated by tanker cargo/equity stories, one-off financial and legal disputes, and a two-vessel wind-assisted coaster order too small to move a fleet-level reading &mdash; none of it changes the supply of ships, the demand for tonne-miles, or the timing lag between them.</p>
+    <div class="note noisebox">Rule of thumb applied here: an item is noise if it's a single-owner financial or legal story, a same-sector cargo/equity move with no capacity read-through, or an index level that is itself the output the Signal tab is trying to explain.</div>
+  </section>
+
+  <div class="articles">
+    <h2>Analyst review &mdash; 19 Aug 2026</h2>
+    <div class="article">
+      <div class="art-head">Baltic Dry Index falls to 2815, down 63 points</div>
+      <div class="art-meta">Aug 18, 2026 <span class="sep">&middot;</span> Hellenic Shipping News <span class="sep">&middot;</span> hellenicshippingnews.com/baltic-dry-index-falls-to-2815-down-63-points/</div>
+      <div class="stopford"><span class="rejtag">ALREADY-IN-PRICE</span> &mdash; the daily index tick is the output the rest of this terminal is trying to explain, not a fresh input.</div>
+    </div>
+    <div class="article">
+      <div class="art-head">UAE halts trade with Iran after latest missiles aimed at its ships</div>
+      <div class="art-meta">Aug 19, 2026 <span class="sep">&middot;</span> TradeWinds (Bulkers alert) <span class="sep">&middot;</span> headline only, paywalled &mdash; sourced from grunde@fjeldheimops.com</div>
+      <div class="stopford"><span class="rejtag">SUB-THRESHOLD</span> / <span class="rejtag">WRONG-SECTOR</span> &mdash; a bilateral trade halt with no quantified dry bulk tonnage read-through this pass; watched, not scored.</div>
+    </div>
+    <div class="article">
+      <div class="art-head">Baltic Shipping adds two wind-assisted coasters that no clients want to pay for</div>
+      <div class="art-meta">Aug 19, 2026 <span class="sep">&middot;</span> TradeWinds (Bulkers alert) <span class="sep">&middot;</span> headline only, paywalled &mdash; sourced from grunde@fjeldheimops.com</div>
+      <div class="stopford"><span class="rejtag">SUB-THRESHOLD</span> &mdash; two small coastal vessels, far too small a segment to move the fleet-level picture.</div>
+    </div>
+    <div class="article">
+      <div class="art-head">Norvic owner Rahman hits out as Mercuria sues wife over unpaid bunker bills</div>
+      <div class="art-meta">Aug 19, 2026 <span class="sep">&middot;</span> TradeWinds (Bulkers alert) <span class="sep">&middot;</span> headline only, paywalled &mdash; sourced from grunde@fjeldheimops.com</div>
+      <div class="stopford"><span class="rejtag">NO-CAPACITY-PATH</span> &mdash; a personal/legal payment dispute; no fleet capacity mechanism.</div>
+    </div>
+    <div class="article">
+      <div class="art-head">Navigare hits back at criticism from watchdog over investment return claims</div>
+      <div class="art-meta">Aug 19, 2026 <span class="sep">&middot;</span> TradeWinds (Finance alert) <span class="sep">&middot;</span> headline only, paywalled &mdash; sourced from grunde@fjeldheimops.com</div>
+      <div class="stopford"><span class="rejtag">NO-CAPACITY-PATH</span> &mdash; fund-marketing compliance dispute, adds/removes no tonnage.</div>
+    </div>
+    <div class="article">
+      <div class="art-head">'I have seen people using ChatGPT': Shipowners take shortcuts on sanctions</div>
+      <div class="art-meta">Aug 19, 2026 <span class="sep">&middot;</span> TradeWinds alert <span class="sep">&middot;</span> headline only, paywalled &mdash; sourced from grunde@fjeldheimops.com</div>
+      <div class="stopford"><span class="rejtag">NO-CAPACITY-PATH</span> &mdash; a compliance-process story, not a supply/demand mechanism.</div>
+    </div>
+    <div class="article">
+      <div class="art-head">Tanker shipments from Argentina hit record level with more to come</div>
+      <div class="art-meta">Aug 19, 2026 <span class="sep">&middot;</span> TradeWinds (Tankers alert) <span class="sep">&middot;</span> headline only, paywalled &mdash; sourced from grunde@fjeldheimops.com</div>
+      <div class="stopford"><span class="rejtag">WRONG-SECTOR</span> &mdash; crude tanker story, no dry bulk read-across.</div>
+    </div>
+    <div class="article">
+      <div class="art-head">Sinokor tipped to add VLCC to the world's largest oil tanker fleet</div>
+      <div class="art-meta">Aug 19, 2026 <span class="sep">&middot;</span> TradeWinds (Tankers alert) <span class="sep">&middot;</span> headline only, paywalled &mdash; sourced from grunde@fjeldheimops.com</div>
+      <div class="stopford"><span class="rejtag">WRONG-SECTOR</span> &mdash; tanker newbuilding/S&amp;P, no dry bulk read-across.</div>
+    </div>
+    <div class="article">
+      <div class="art-head">Is Middle East turmoil papering over the cracks for product tankers?</div>
+      <div class="art-meta">Aug 19, 2026 <span class="sep">&middot;</span> TradeWinds (Tankers alert) <span class="sep">&middot;</span> headline only, paywalled &mdash; sourced from grunde@fjeldheimops.com</div>
+      <div class="stopford"><span class="rejtag">WRONG-SECTOR</span> &mdash; product tanker fundamentals commentary.</div>
+    </div>
+    <div class="article">
+      <div class="art-head">Oslo tanker stocks gain as charterers rush to replace Middle East and Russian oil</div>
+      <div class="art-meta">Aug 19, 2026 <span class="sep">&middot;</span> TradeWinds (Suezmax alert) <span class="sep">&middot;</span> headline only, paywalled &mdash; sourced from grunde@fjeldheimops.com</div>
+      <div class="stopford"><span class="rejtag">WRONG-SECTOR</span> &mdash; tanker equities move, no dry bulk capacity path.</div>
+    </div>
+    <div class="article">
+      <div class="art-head">Sinokor VLCCs load in Gulf as Aramco restarts exports amid attacks</div>
+      <div class="art-meta">Aug 19, 2026 <span class="sep">&middot;</span> TradeWinds (Tankers alert) <span class="sep">&middot;</span> headline only, paywalled &mdash; sourced from grunde@fjeldheimops.com</div>
+      <div class="stopford"><span class="rejtag">WRONG-SECTOR</span> &mdash; crude tanker cargo restart, no dry bulk read-across.</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  The live feed refreshes daily at 06:40 CET from shipping newsletters received in Gmail and public RSS feeds, via GitHub Actions. Newsletter items are cited by headline only &mdash; article text and subscriber links are never published. Classification is rule-based and marked VERIFY: read the source before acting. Price cards and analyst review sections are dated and updated manually.
+</footer>
+
+</div>
+<script>
+/*SIGNALS_START*/
+let ARTICLES=[];
+/*SIGNALS_END*/
+(function(){
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];}); }
+  function card(a){
+    var head = a.url ? '<a href="'+esc(a.url)+'" target="_blank" rel="noopener noreferrer">'+esc(a.t)+'</a>' : esc(a.t);
+    var score = a.sig ? '<span class="tag '+(a.s>0?'bullish':'bearish')+'">'+(a.s>0?'+':'')+a.s+' '+(a.s>0?'RATE-SUPPORTIVE':'RATE-NEGATIVE')+'</span> ' : '<span class="tag noise">NOISE</span> ';
+    var tags = (a.tags||[]).map(function(t){return '<span class="pill">'+esc(t)+'</span>';}).join('');
+    return '<div class="article"><div class="art-head">'+head+'</div>'+
+      '<div class="art-meta">'+esc(a.d)+'<span class="sep">&middot;</span>'+esc(a.src)+(a.via==='email'?' (newsletter, headline only)':'')+'</div>'+
+      '<div>'+score+tags+'</div>'+
+      '<div class="stopford"><span class="stopford-label">Per Stopford\'s framework:</span> '+a.why+'</div></div>';
+  }
+  function fill(id, list, emptyMsg){
+    var el=document.getElementById(id); if(!el) return;
+    el.innerHTML = list.length ? list.map(card).join('') : '<div class="empty">'+emptyMsg+'</div>';
+  }
+  var sig=ARTICLES.filter(function(a){return a.sig;}).sort(function(a,b){return (b.ts>a.ts)-(b.ts<a.ts) || Math.abs(b.s)-Math.abs(a.s);});
+  var noi=ARTICLES.filter(function(a){return !a.sig;});
+  fill('liveSignal', sig, 'No item passed the signal tests in the last 7 days.');
+  fill('liveNoise',  noi, 'No noise items in the last 7 days.');
+})();
+</script>
+<script>
+  document.querySelectorAll('.tabbtn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.tabbtn').forEach(function(b){ b.classList.remove('active'); });
+      document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>
